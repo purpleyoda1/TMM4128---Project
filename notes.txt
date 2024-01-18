@@ -1,0 +1,2 @@
+H20 AutoML (AutoML generelt) for å kjapt generere masse modeller om et dataset og indikere hvilke som funker best
+
