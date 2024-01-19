@@ -2,11 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from sklearn import neighbors
+import pandas as pd
 
 def plot_decision_boundary(model, X, y, n_neighbors):
     #Color maps
     cmap_light = ListedColormap(['#FFAAAA', '#AAAAFF', '#AAFFAA'])
     cmap_bold = ListedColormap(['#FF0000', '#0000FF', '#00FF00'])
+
+    X = X.to_numpy()
 
     #Limiting to only two features
     X = X[:, :2]

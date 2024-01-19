@@ -1,9 +1,11 @@
 import data_loader
 import knn_model
+import plotting
+import numpy as np
 
 def main():
 
-    file_path = "../Datasets/iris.data"
+    file_path = 'TMM4128---Project/Datasets/Iris/iris.data'
 
     X, y_encoded, class_names = data_loader.data_loader(file_path)
 
@@ -25,6 +27,8 @@ def main():
             best_n = i
     
     print(f"Best accuracy was {best_acc} achieved with n={best_n} ")
+
+    plotting.plot_decision_boundary(model, X_test, y_test, 8)
 
 
 if __name__ == "__main__":
