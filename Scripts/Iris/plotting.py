@@ -18,8 +18,8 @@ def plot_decision_boundary(model, X, y, n_neighbors):
     X_min, X_max = X[:, 0].min()-1, X[:, 0].max()+1
     y_min, y_max = X[:, 1].min()-1, X[:, 1].max()+1
 
-    xx, yy = np.meshgrid(np.arange(X_min, X_max, 0.2),
-                         np.arange(y_min, y_max, 0.2))
+    xx, yy = np.meshgrid(np.arange(X_min, X_max, 0.02),
+                         np.arange(y_min, y_max, 0.02))
     
     #Predicting what class is on all grid point
     Z = model.predict(np.c_[xx.ravel(), yy.ravel()])

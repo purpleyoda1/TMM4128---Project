@@ -1,2 +1,17 @@
 H20 AutoML (AutoML generelt) for å kjapt generere masse modeller om et dataset og indikere hvilke som funker best
 
+Mulige datasett:
+ - Global Shark attack
+ - Video game sales
+ - Museum collection
+ - Music genre
+ 
+Noen litt mer klassiske classification
+ - Zoo animals 
+ - Poisonous mushrooms
+ - Red wine
+ - Medical
+ - Spambase
+
+Andre tekster
+https://scholarworks.calstate.edu/downloads/73666b68n
