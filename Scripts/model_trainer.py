@@ -7,7 +7,7 @@ This script creates and trains a ML model. Step by step it does the following:
  - Save the model, labels, and scaler as joblibs in 'Datasets/Music_genre/Models/KNN'
 
  How to use:
- - Select algorithm by changing the booleans in the top
+ - Select algorithm by changing the model_name in the top
  - Change pipeland and param_grid if needed
  - Run
 """
@@ -15,65 +15,80 @@ This script creates and trains a ML model. Step by step it does the following:
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
-import os
 import joblib
 import utilities
 import pandas as pd
 
+#Set model_name to either KNN, RF, or SVM depending on what model you want to train
+model_name = "KNN"
+#Modify pipeline and param_grid as you wish
 
-use_KNN = True
-use_RandomForest = False
 
-
-if use_KNN:
+if model_name == "KNN":
     pipeline = Pipeline([
             ('scaler', StandardScaler()),
             ('knn', KNeighborsClassifier())
         ])
 
     param_grid = {
-            'knn__n_neighbors': range(2, 22),
-            'knn__weights': ['uniform', 'distance'],
-            'knn__metric': ['euclidean', 'manhattan']
+            'knn__n_neighbors': range(1, 21),
+            #'knn__weights': ['uniform', 'distance'],
+            #'knn__metric': ['euclidean', 'manhattan']
         }
     #Filepaths
-    model_name = "KNN"
-    results_filename = 'OG_params'
-    pdf_filepath = 'Results/KNN/' + results_filename + '.pdf'
-    txt_filename = 'Results/KNN/' + results_filename + '.txt'
-    model_path = 'Models/KNN/knn.joblib'
-    scaler_path = 'Models/KNN/knn_scaler.joblib'
-
-if use_RandomForest:
+    results_filename = 'scaler'
+    pdf_filepath = 'Results/BestParameters/KNN/' + results_filename + '.pdf'
+    txt_filename = 'Results/BestParameters/KNN/' + results_filename + '.txt'
+    model_path = 'Models/KNN/KNN.joblib'
+    scaler_path = 'Models/KNN/KNN_scaler.joblib'
+elif model_name == "RF":
     pipeline = Pipeline([
             ('scaler', StandardScaler()),
             ('rf', RandomForestClassifier(random_state= 42))
         ])
     
     param_grid = {
-        'rf__n_estimators' : [100, 200, 300],
-        'rf__max_depth' : [None, 10, 20, 30],
-        'rf__min_samples_split' : [2, 5, 10],
-        'rf__min_samples_leaf' : [1, 2, 4]
+        'rf__n_estimators' : [235],
+        'rf__max_depth' : [13],
+        'rf__min_samples_split' : [2], 
+        'rf__min_samples_leaf' : [1]
     }
 
     #Filepaths
     model_name = "RF"
-    results_filename = 'first_try'
-    pdf_filepath = 'Results/RF/' + results_filename + '.pdf'
-    txt_filename = 'Results/RF/' + results_filename + '.txt'
-    model_path = 'Models/RF/rf.joblib'
-    scaler_path = 'Models/RF/rf_scaler.joblib'
+    results_filename = 'optimized_CV10'
+    pdf_filepath = 'Results/BestParameters/RF/' + results_filename + '.pdf'
+    txt_filename = 'Results/BestParameters/RF/' + results_filename + '.txt'
+    model_path = 'Models/RF/RF.joblib'
+    scaler_path = 'Models/RF/RF_scaler.joblib'
+elif model_name == "SVM":
+    pipeline = Pipeline([
+            ('scaler', StandardScaler()),
+            ('svm', SVC())
+        ])
+
+    param_grid = {
+            'svm__C': [0.1, 1, 10, 100],
+            'svm__kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
+            'svm__gamma': ['scale', 'auto'] 
+        }
+    # Filepaths
+    model_name = "SVM"
+    results_filename = 'testing'
+    pdf_filepath = 'Results/BestParameters/SVM/' + results_filename + '.pdf'
+    txt_filename = 'Results/BestParameters/SVM/' + results_filename + '.txt'
+    model_path = 'Models/SVM/SVM.joblib'
+    scaler_path = 'Models/SVM/SVM_scaler.joblib'
+
+
 
 
 def create_and_train_gridsearch(X_train, y_train):
-
     grid_search = GridSearchCV(pipeline, param_grid, cv=5, verbose=1, n_jobs=-1)
-
     grid_search.fit(X_train, y_train)
 
     return grid_search
@@ -88,15 +103,14 @@ def create_train_and_save_model_scaled():
     results = pd.DataFrame(grid_search.cv_results_)
     results = results.sort_values(by='rank_test_score')
     results= results[['rank_test_score', 'mean_test_score', 'params']]
-    utilities.save_data_frame_as_pdf(results, pdf_filepath)
+    #utilities.save_data_frame_as_pdf(results, pdf_filepath)
     scaler = grid_search.best_estimator_.named_steps['scaler']
 
     #Use grid search to train a model
     model = grid_search.best_estimator_
-    model.fit(X_train, y_train)
     
     #Test the model
-    utilities.test_model(txt_filename, model_name= model_name, path=False, model=model, params= grid_search.best_params_)
+    utilities.test_model(txt_filename, model_name= model_name, path=False, model= model, params= grid_search.best_params_, create_heatmap= True)
 
     #Save the model and scaler
     joblib.dump(model, model_path)

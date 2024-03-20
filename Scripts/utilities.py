@@ -8,8 +8,11 @@ import joblib
 import extract_from_audio
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import os
-import seaborn as sns
 import re
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+
 
 
 def save_data_frame_as_pdf(df, filepath):
@@ -56,54 +59,62 @@ def compare_dataset_and_input(genre = 'blues', number = '00001'):
 
 
 
-def get_data():
+def get_data(scale= False):
     X_train = pd.read_csv('Datasets/Training_test_splits/X_train.csv')  
     X_test = pd.read_csv('Datasets/Training_test_splits/X_test.csv')
     y_train = np.loadtxt('Datasets/Training_test_splits/y_train.csv')
     y_test = np.loadtxt('Datasets/Training_test_splits/y_test.csv')
 
+    if scale:
+        scaler = StandardScaler().fit(X_train)
+        X_train = scaler.transform(X_train)
+        X_test = scaler.transform(X_test)
+ 
     return X_train, X_test, y_train, y_test
 
 
 
 def create_cm_heatmap(cm, model_name):
-    plt.figure(figsize=(20, 20))
+    plt.figure(figsize=(15, 15))
     genre_labels = joblib.load('Models/genre_labels.joblib')
     sns.heatmap(cm, annot= True, fmt= 'g', cmap= 'Reds', cbar= False, xticklabels= genre_labels, yticklabels= genre_labels)
-    plt.xlabel("Predictet labels", 15)
-    plt.ylabel("True labels", 15)
-    plt.title("Confusion matrix" + model_name)
+    plt.xlabel("Predictet labels", fontsize= 15)
+    plt.ylabel("True labels", fontsize= 15)
+    plt.title("Confusion matrix for " + model_name)
     plt.xticks(rotation=45)
     plt.yticks(rotation=45)
     plt.tight_layout()
-    plt.savefig('Results/' + model_name +' Vizualisations')
-
+    plt.savefig('Results/ConfusionMatrixes/confusion_matrix' + model_name)
     plt.show()
 
 
 
-def test_model(results_dir, model_name, path= True, model_path= None, model= None, params= None):
-    _,X_test,_, y_test = get_data()
+def test_model(results_dir, model_name, path= True, model_path= None, model= None, params= None, create_heatmap= False):
+    X_train, X_test, y_train, y_test = get_data()
 
     #If it needs to load a model from a file
     if (path):
         model = joblib.load(model_path)
 
-    #Make predictions
-    predictions = model.predict(X_test)
+    #Check training asccuracy
+    train_predicitions = model.predict(X_train)
+    train_accuracy = accuracy_score(y_train, train_predicitions)
 
-    #Test the predictions
+    #Make predictions on test set
+    predictions = model.predict(X_test)
     accuracy = accuracy_score(y_test, predictions)
     conf_matrix = confusion_matrix(y_test, predictions)
     class_report = classification_report(y_test, predictions)
 
     #Print the predictions
-    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Train accuracy: {train_accuracy:.4f}")
+    print(f"Test accuracy: {accuracy:.4f}")
     print("Confusion Matrix:\n", conf_matrix)
     print("Classification Report:\n", class_report)
 
     #Make and save confusion matrix vizualisation
-    create_cm_heatmap(conf_matrix, model_name)
+    if create_heatmap:
+        create_cm_heatmap(conf_matrix, model_name)
 
     #Save the values
     with open(f'{results_dir}', "w") as f:
@@ -113,6 +124,7 @@ def test_model(results_dir, model_name, path= True, model_path= None, model= Non
         f.write(f"{conf_matrix}\n\n")
         f.write(f"Classification report: \n")
         f.write(f"{class_report}")
+        f.write(f"Training accuracy: {train_accuracy}")
 
 
 
@@ -141,5 +153,107 @@ def retrieve_test_results(filepath):
     
     return params, accuracy, conf_matrix, class_report
 
+def plot_model_parameter_range(model_name, param_name, param_range):
+    #For plotting the accuracy of a model over a range of parameters
+    model_path = 'Models/' + model_name + '/' + model_name + '.joblib'
+    model = joblib.load(model_path)
 
+    training_acc = []
+    testing_acc = []
+    #Get data
+    X_train, X_test, y_train, y_test = get_data(scale= True)
+
+    if model_name == "KNN":
+        for value in param_range:
+            #Make a new model
+            new_model = KNeighborsClassifier(n_neighbors= value)
+
+            #Train model
+            new_model.fit(X_train, y_train)
+
+            #Find training accuracy
+            train_pred = new_model.predict(X_train)
+            train_acc = accuracy_score(y_train, train_pred)
+            training_acc.append(train_acc)
+
+            #Find test accuracy
+            test_pred = new_model.predict(X_test)
+            test_acc = accuracy_score(y_test, test_pred)
+            testing_acc.append(test_acc)
+
+    print(f"{train_acc}")
+    plt.figure(figsize= (12, 10))
+    plt.plot(param_range, training_acc, label= 'Training accuracy')
+    plt.plot(param_range, testing_acc, label= 'Testing accuracy')
+    plt.xlabel(param_name)
+    plt.ylabel('Accuracy')
+    plt.title(f'Accuracy over a variety of {param_name} values')
+    plt.legend()
+    plt.savefig('Results/ParameterPlots/' + model_name + '_' + param_name)
+    plt.show()
+
+
+if __name__ == '__main__':
+    plot_model_parameter_range(model_name= "KNN", param_name= "n_neighbors", param_range=range(1, 21))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+""" def plot_gridsearch_results(gridsearch, model_name, param_name):
+    #Plots the accuracy changing as the gridsearch iterates trough different values for a certain parameter
+
+    results = pd.Dataframe(gridsearch.cv_results_)
+    param_column = f'param_{param_name}'
+
+    if param_column in results:
+        mean_scores = results.groupby(param_column).apply(
+            lambda x: pd.Series({
+                'mean_train_score': x['mean_train_score'].mean(),
+                'mean_test_score': x['mean_test_score'].mean()
+
+            })
+        ).reset_index()
+    
+    plt.plot(fig_size = (12, 10))
+    plt.plot(mean_scores[param_column], mean_scores['mean_train_score'], label= 'Mean Train Score')
+    plt.plot(mean_scores[param_column], mean_scores['mean_test_score'], label= 'Mean Test Score')
+    plt.xlabel(param_name)
+    plt.ylabel("Accuracy")
+    plt.title(f"Test vs Training accuracy for {model_name} with varying {param_name}")
+    plt.legend()
+    plt.save('Results/TrainingPlots/' + model_name + '_' + param_name)
+    plt.show() """
 
