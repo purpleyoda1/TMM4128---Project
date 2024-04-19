@@ -12,8 +12,17 @@ import re
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
+import feature_selection as fs
 
 
+
+def decode_labels(y):
+    y = pd.DataFrame(y, columns= ['label'])
+    genre_labels = joblib.load('Models/genre_labels.joblib')
+    label_dict = {index: label for index, label in enumerate (genre_labels)}
+    y['label'] = y['label'].map(label_dict)
+
+    return y
 
 def save_data_frame_as_pdf(df, filepath):
 
@@ -59,7 +68,7 @@ def compare_dataset_and_input(genre = 'blues', number = '00001'):
 
 
 
-def get_data(scale= False):
+def get_data(scale= False, get_scaled= False):
     X_train = pd.read_csv('Datasets/Training_test_splits/X_train.csv')  
     X_test = pd.read_csv('Datasets/Training_test_splits/X_test.csv')
     y_train = np.loadtxt('Datasets/Training_test_splits/y_train.csv')
@@ -69,16 +78,20 @@ def get_data(scale= False):
         scaler = StandardScaler().fit(X_train)
         X_train = scaler.transform(X_train)
         X_test = scaler.transform(X_test)
+    
+    if get_scaled:
+        X_train = pd.read_csv('Datasets/Training_test_splits/Scaled/X_train_scaled.csv')  
+        X_test = pd.read_csv('Datasets/Training_test_splits/Scaled/X_test_scaled.csv')
  
     return X_train, X_test, y_train, y_test
 
 
 
 def create_cm_heatmap(cm, model_name):
-    plt.figure(figsize=(15, 15))
+    plt.figure(figsize=(8, 8))
     genre_labels = joblib.load('Models/genre_labels.joblib')
     sns.heatmap(cm, annot= True, fmt= 'g', cmap= 'Reds', cbar= False, xticklabels= genre_labels, yticklabels= genre_labels)
-    plt.xlabel("Predictet labels", fontsize= 15)
+    plt.xlabel("Predicted labels", fontsize= 15)
     plt.ylabel("True labels", fontsize= 15)
     plt.title("Confusion matrix for " + model_name)
     plt.xticks(rotation=45)
@@ -89,8 +102,19 @@ def create_cm_heatmap(cm, model_name):
 
 
 
-def test_model(results_dir, model_name, path= True, model_path= None, model= None, params= None, create_heatmap= False):
+def test_model(results_dir, model_name, path= True, model_path= None, model= None, params= None, create_heatmap= False, num_features= 57, method= "univariate"):
     X_train, X_test, y_train, y_test = get_data()
+
+    cf_name = model_name
+    if num_features != 57:
+        if method == "univariate":
+            _, _, X_train, X_test = fs.univariate_feature_selection(num_features= num_features)
+            cf_name += '_' + method
+
+        elif method == "recursive":
+            _, X_train, X_test = fs.recursive_feature_elimnination(num_features= num_features)
+            cf_name += '_' + method
+
 
     #If it needs to load a model from a file
     if (path):
@@ -114,7 +138,7 @@ def test_model(results_dir, model_name, path= True, model_path= None, model= Non
 
     #Make and save confusion matrix vizualisation
     if create_heatmap:
-        create_cm_heatmap(conf_matrix, model_name)
+        create_cm_heatmap(conf_matrix, cf_name)
 
     #Save the values
     with open(f'{results_dir}', "w") as f:
@@ -153,7 +177,7 @@ def retrieve_test_results(filepath):
     
     return params, accuracy, conf_matrix, class_report
 
-def plot_model_parameter_range(model_name, param_name, param_range):
+def plot_model_parameter_range(model_name, param_name, param_range, x_ticks= None):
     #For plotting the accuracy of a model over a range of parameters
     model_path = 'Models/' + model_name + '/' + model_name + '.joblib'
     model = joblib.load(model_path)
@@ -181,20 +205,53 @@ def plot_model_parameter_range(model_name, param_name, param_range):
             test_acc = accuracy_score(y_test, test_pred)
             testing_acc.append(test_acc)
 
-    print(f"{train_acc}")
-    plt.figure(figsize= (12, 10))
-    plt.plot(param_range, training_acc, label= 'Training accuracy')
-    plt.plot(param_range, testing_acc, label= 'Testing accuracy')
+    plt.figure(figsize= (6, 5))
+    plt.plot(param_range, training_acc, label= 'Training accuracy', lw= 2, color= 'black')
+    plt.plot(param_range, testing_acc, label= 'Testing accuracy', lw= 2, linestyle= '--', marker= 'o', color= 'red')
     plt.xlabel(param_name)
     plt.ylabel('Accuracy')
     plt.title(f'Accuracy over a variety of {param_name} values')
+    plt.xticks(x_ticks)
     plt.legend()
     plt.savefig('Results/ParameterPlots/' + model_name + '_' + param_name)
     plt.show()
 
 
+def plot_mean_feature_values(filepath, scaled= False):
+    data = pd.read_csv(filepath)
+    if not scaled:
+        data = data.drop(["filename", "length"], axis=1)
+    mean_features = data.groupby('label').mean().reset_index()
+
+    melted_df = pd.melt(mean_features, id_vars=["label"], var_name="Feature", value_name="Mean")
+
+    # Plotting
+    plt.figure(figsize=(12, 8))
+    sns.barplot(data=melted_df, x='Feature', y='Mean', hue='label')
+    plt.title('Mean Feature Values by Genre')
+    plt.xticks(rotation=45)  # Rotates the feature names for better readability
+    plt.ylabel('Mean Value')
+    plt.xlabel('Feature')
+    plt.legend(title='Genre')
+    plt.show()
+
+def plot_train_test_accuracies(train, test, index, path):
+    plt.figure(figsize=(10, 6))
+    plt.plot(index, train, label='Training accuracy', color= 'purple')
+    plt.plot(index, test, label= 'Testing accuracy', color= 'green')
+    plt.xlabel('Number of features')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy vs. Number of features')
+    plt.gca().invert_xaxis()
+    plt.legend()
+    plt.savefig(path)
+    plt.show()
+
+
 if __name__ == '__main__':
-    plot_model_parameter_range(model_name= "KNN", param_name= "n_neighbors", param_range=range(1, 21))
+    #plot_model_parameter_range(model_name= "KNN", param_name= "n_neighbors", param_range=range(1, 42), x_ticks= [1, 9, 17, 25, 33, 41])
+    plot_mean_feature_values('Datasets/features_30_sec.csv')
+    plot_mean_feature_values('Datasets/features_30_sec_scaled.csv', scaled= True)
 
 
 

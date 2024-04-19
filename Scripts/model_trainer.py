@@ -19,19 +19,23 @@ from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import accuracy_score
 import joblib
 import utilities
 import pandas as pd
+import feature_selection as fs
+
 
 #Set model_name to either KNN, RF, or SVM depending on what model you want to train
-model_name = "KNN"
+model_name = "RF"
+feature_selection = True
 #Modify pipeline and param_grid as you wish
 
 
 if model_name == "KNN":
     pipeline = Pipeline([
-            ('scaler', StandardScaler()),
-            ('knn', KNeighborsClassifier())
+            #('scaler', StandardScaler()),
+            #('knn', KNeighborsClassifier())
         ])
 
     param_grid = {
@@ -40,7 +44,7 @@ if model_name == "KNN":
             #'knn__metric': ['euclidean', 'manhattan']
         }
     #Filepaths
-    results_filename = 'scaler'
+    results_filename = 'simple'
     pdf_filepath = 'Results/BestParameters/KNN/' + results_filename + '.pdf'
     txt_filename = 'Results/BestParameters/KNN/' + results_filename + '.txt'
     model_path = 'Models/KNN/KNN.joblib'
@@ -52,15 +56,15 @@ elif model_name == "RF":
         ])
     
     param_grid = {
-        'rf__n_estimators' : [235],
-        'rf__max_depth' : [13],
-        'rf__min_samples_split' : [2], 
-        'rf__min_samples_leaf' : [1]
+        'rf__n_estimators' : [100, 200, 300, 400],
+        'rf__max_depth' : [10, 20, 30, None],
+        'rf__min_samples_split' : [2, 5, 10], 
+        'rf__min_samples_leaf' : [1, 2, 4],
+        'rf__criterion': ['gini', 'entropy']
     }
 
     #Filepaths
-    model_name = "RF"
-    results_filename = 'optimized_CV10'
+    results_filename = 'everything'
     pdf_filepath = 'Results/BestParameters/RF/' + results_filename + '.pdf'
     txt_filename = 'Results/BestParameters/RF/' + results_filename + '.txt'
     model_path = 'Models/RF/RF.joblib'
@@ -74,11 +78,11 @@ elif model_name == "SVM":
     param_grid = {
             'svm__C': [0.1, 1, 10, 100],
             'svm__kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
+            #'svm__kernel': ['linear'],
             'svm__gamma': ['scale', 'auto'] 
         }
     # Filepaths
-    model_name = "SVM"
-    results_filename = 'testing'
+    results_filename = 'everything'
     pdf_filepath = 'Results/BestParameters/SVM/' + results_filename + '.pdf'
     txt_filename = 'Results/BestParameters/SVM/' + results_filename + '.txt'
     model_path = 'Models/SVM/SVM.joblib'
@@ -118,9 +122,75 @@ def create_train_and_save_model_scaled():
 
     return 0
 
+def train_model_w_feature_selection(method, enable_print= False):
+    #This function is alot more computationally expensive than it needs to be 
+    #but in the final weeks we only need something that works, not something optimized
+    X_train, X_test, y_train, y_test = utilities.get_data()
+    train_accuracies = []
+    test_accuracies = []
+    feature_counts = []
+    best_test_acc = 0
+    best_model = None
+    best_grid_search = None
+    best_num_features = None
+
+
+    for i in range(57, 1, -1):
+        feature_counts.append(i)
+        #Reduce the number of features iteratively
+        if method == "univariate":
+            _, _, X_train, X_test = fs.univariate_feature_selection(num_features= i)
+
+        elif method == "recursive":
+            _, X_train, X_test = fs.recursive_feature_elimnination(num_features= i)
+        print(f"Shape of X_train: {X_train.shape}")
+        print(f"Shape of X_test: {X_test.shape}")
+
+
+        #Perform gridsearch on reduced training set
+        grid_search = create_and_train_gridsearch(X_train, y_train)
+        model = grid_search.best_estimator_
+
+        #Get accuracies
+        train_predicitions = model.predict(X_train)
+        train_accuracy = accuracy_score(y_train, train_predicitions)
+        test_predicitions = model.predict(X_test)
+        test_accuracy = accuracy_score(y_test, test_predicitions)
+        acc_differance = abs(train_accuracy - test_accuracy)
+
+        #Log accuracies
+        train_accuracies.append(train_accuracy)
+        test_accuracies.append(test_accuracy)
+        if enable_print:
+            print(f"Num of features: {i}")
+            print(f"Training acc: {train_accuracy}")
+            print(f"Test acc: {test_accuracy}\n\n")
+
+        #Arbitrarily chosen limits to avoid overfitting
+        if train_accuracy < 0.98 and acc_differance < 0.2:
+            if test_accuracy > best_test_acc:
+                best_test_acc = test_accuracy
+                best_model = model
+                best_grid_search = grid_search
+                best_num_features = i
+
+
+    #Now that the best model is found, we test, save, and plot
+    print(f"Training acc: {train_accuracy}")
+    print(f"Test acc: {test_accuracy}")
+    print(f"Num features: {best_num_features}")
+
+    utilities.test_model('Results/BestParameters/' + model_name + '/FS_' + results_filename, model_name= model_name, path=False, model= best_model, params= best_grid_search.best_params_, create_heatmap= True, num_features=best_num_features)
+    
+    utilities.plot_train_test_accuracies(train_accuracies, test_accuracies, feature_counts, 'Results/FeatureSelection/' + model_name + '_' + method + '_' + results_filename)
+
+
 
 if __name__ == "__main__":
-    create_train_and_save_model_scaled()
+    if feature_selection:
+        train_model_w_feature_selection("univariate")
+    else:
+        create_train_and_save_model_scaled()
 
 
 

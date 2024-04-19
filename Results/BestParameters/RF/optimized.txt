@@ -31,3 +31,4 @@ Classification report:
     accuracy                           0.71       200
    macro avg       0.70      0.71      0.70       200
 weighted avg       0.70      0.71      0.70       200
+Training accuracy: 0.99875

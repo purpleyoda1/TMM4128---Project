@@ -16,6 +16,9 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 import numpy as np
 import joblib
+import utilities
+from sklearn.preprocessing import StandardScaler
+
 
 def data_loader(filepath):
     data = pd.read_csv(filepath)
@@ -36,7 +39,7 @@ def data_split(X, y, test_size=0.2, random_state=42):
 
     X_train.to_csv('Datasets/Training_test_splits/X_train.csv', index=False)
     X_test.to_csv('Datasets/Training_test_splits/X_test.csv', index=False)
-        #Save y as np array
+    #Save y as np array
     np.savetxt('Datasets/Training_test_splits/y_train.csv', y_train, delimiter=',')
     np.savetxt('Datasets/Training_test_splits/y_test.csv', y_test, delimiter=',')
 
@@ -46,9 +49,30 @@ def data_split(X, y, test_size=0.2, random_state=42):
 
     return X_train, X_test, y_train, y_test
 
+def create_scaled_sets():
+    #Load data
+    X_train, X_test, _, _ = utilities.get_data()
+
+    #Load and fit scaler
+    scaler = StandardScaler()
+    scaler.fit(X_train)
+
+    #Scale data
+    X_train_scaled = scaler.transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    #Save data
+    X_train_scaled = pd.DataFrame(X_train_scaled, index=X_train.index, columns=X_train.columns)
+    X_test_scaled = pd.DataFrame(X_test_scaled, index=X_test.index, columns=X_test.columns)
+    X_train_scaled.to_csv('Datasets/Training_test_splits/Scaled/X_train_scaled.csv', index=False)
+    X_test_scaled.to_csv('Datasets/Training_test_splits/Scaled/X_test_scaled.csv', index=False)
+
+    """ np.savetxt('Datasets/Training_test_splits/ScaledX_train_scaled.csv', X_train, delimiter= ',')
+    np.savetxt('Datasets/Training_test_splits/ScaledX_test_scaled.csv', X_test, delimiter= ',') """
+
+
 if __name__ == "__main__":
-    X, y_encoded = data_loader('Datasets/features_30_sec.csv')
-    data_split(X, y_encoded)
+    create_scaled_sets()
 
 
 
