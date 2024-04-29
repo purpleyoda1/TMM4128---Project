@@ -56,9 +56,9 @@ elif model_name == "RF":
         ])
     
     param_grid = {
-        'rf__n_estimators' : [100, 200, 300, 400],
-        'rf__max_depth' : [10, 20, 30, None],
-        'rf__min_samples_split' : [2, 5, 10], 
+        'rf__n_estimators' : [100, 200, 300],
+        'rf__max_depth' : [20, 30, None],
+        'rf__min_samples_split' : [2, 5], 
         'rf__min_samples_leaf' : [1, 2, 4],
         'rf__criterion': ['gini', 'entropy']
     }
@@ -167,7 +167,7 @@ def train_model_w_feature_selection(method, enable_print= False):
             print(f"Test acc: {test_accuracy}\n\n")
 
         #Arbitrarily chosen limits to avoid overfitting
-        if train_accuracy < 0.98 and acc_differance < 0.2:
+        if train_accuracy < 0.95: #and acc_differance < 0.2:
             if test_accuracy > best_test_acc:
                 best_test_acc = test_accuracy
                 best_model = model
